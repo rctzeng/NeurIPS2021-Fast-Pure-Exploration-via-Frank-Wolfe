@@ -21,7 +21,7 @@ end
 threshold = 0.9;
 
 pep = LinearThreshold(dist, arms, threshold);
-srs = [BestChallengerTracking(), ConvexGame(CTracking), LearnerK(CTracking), RoundRobin()];
+srs = [FWSampling(), ConvexGame(CTracking), LearnerK(CTracking), RoundRobin()];
 
 δs = (0.1,0.01,0.001,0.0001); # confidence
 βs = GK16.(δs);

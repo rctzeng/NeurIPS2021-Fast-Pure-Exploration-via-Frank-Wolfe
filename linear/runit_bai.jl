@@ -29,8 +29,9 @@ function runit(seed, sr, μ, pep::LinearBestArm, βs, δs)
     # βs: list of thresholds.
     convex_sr = (typeof(sr) == ConvexGame) || (typeof(sr) == LearnerK);
     xya_sr = typeof(sr) == XYAdaptive;
-    qbc_sr = typeof(sr) == BestChallengerTracking;
+    qbc_sr = typeof(sr) == FWSampling;
     lztas_sr = typeof(sr) == LazyTrackAndStop;
+    gap_sr = typeof(sr) == LinGapE;
 
     βs = collect(βs) # mutable copy
     δs = collect(δs); # mutable copy
@@ -82,7 +83,7 @@ function runit(seed, sr, μ, pep::LinearBestArm, βs, δs)
     # start sampling rules
     if qbc_sr
         state = start(sr, N, Vxinv)
-    elseif convex_sr
+    elseif convex_sr # keep as the implementations by Xuedong
         state = start(sr, N, P);
     else
         state = start(sr, N);
@@ -105,17 +106,17 @@ function runit(seed, sr, μ, pep::LinearBestArm, βs, δs)
                     return R
                 end
             end
-        elseif lztas_sr
-            Z, star, ξ = glrt(pep, N, hμ, Vinv);
-            while (Z > β(sr, lztas_A, lztas_c1, lztas_c2, lztas_c3, dim, δs[1], t)) && (t >= dim)
-                popfirst!(δs);
+        elseif gap_sr
+            _, star, ξ = glrt(pep, N, hμ, Vinv)
+            # invoke sampling rule
+            i, k, ucb = nextsample(state, pep, star, ξ, N, S, Vinv, βs[1](t))
+            while ucb <= 0
+                popfirst!(βs)
                 push!(R, (star, copy(N), CPUtime_us() - baseline))
-                if isempty(δs)
-                    return R;
+                if isempty(βs)
+                    return R
                 end
             end
-            i, k, lztas_i0 = nextsample(state, pep, N, S, Vinv, lztas_A, lztas_A0, lztas_i0, lztas_c0);
-            lztas_A += pep.arms[k]*(pep.arms[k]');
         else
             Z, star, ξ = glrt(pep, N, hμ, Vinv);
             while Z > βs[1](t)
@@ -128,6 +129,9 @@ function runit(seed, sr, μ, pep::LinearBestArm, βs, δs)
             # invoke sampling rule
             if convex_sr
                 i, k = nextsample(state, pep, star, ξ, N, P, S, Vinv);
+            elseif lztas_sr
+                i, k, lztas_i0 = nextsample(state, pep, N, S, Vinv, lztas_A, lztas_A0, lztas_i0, lztas_c0);
+                lztas_A += pep.arms[k]*(pep.arms[k]');
             else
                 i, k = nextsample(state, pep, N, S, Vinv)
             end

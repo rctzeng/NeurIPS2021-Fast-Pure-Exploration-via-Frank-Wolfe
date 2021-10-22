@@ -18,7 +18,7 @@ seed = 1234;
 pep = BestArm(dist);
 # sampling rules to be compared
 srs = [
-    BestChallengerTracking(),
+    FWSampling(),
     TrackAndStop(DTracking),
     DaBomb(CTracking, nanswers(pep, μ)),
     Menard(CTracking, 1/oracle(pep, μ)[1]),

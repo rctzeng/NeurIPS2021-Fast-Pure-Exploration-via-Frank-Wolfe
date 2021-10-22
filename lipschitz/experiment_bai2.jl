@@ -15,7 +15,7 @@ arms = [0,96,97,98, 99, 100, 101, 102,103,104]
 
 pep = LipschitzBestArm(dist, arms, μ, L);
 # methods to be compared
-srs = [BestChallengerTracking(), Menard(CTracking, 1/oracle(pep, μ)[1]), TrackAndStop(DTracking)];
+srs = [FWSampling(), Menard(CTracking, 1/oracle(pep, μ)[1]), TrackAndStop(DTracking)];
 
 δs =  (0.1,0.01); # confidence
 βs = GK16.(δs);

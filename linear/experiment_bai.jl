@@ -26,18 +26,18 @@ end
 
 pep = LinearBestArm(dist, arms);
 # methods to be compared
-srs = [
-    BestChallengerTracking(), LazyTrackAndStop("P"), LazyTrackAndStop("H"), LazyTrackAndStop("O"),
-    ConvexGame(CTracking), LearnerK(CTracking), RoundRobin()
-];
-#srs = [XYAdaptive()]; # separately run for different δs
+srs = [FWSampling(), LazyTrackAndStop(), ConvexGame(CTracking), LearnerK(CTracking), XYAdaptive(), RoundRobin()]; # (1) run only for δs = (0.01,) for plot figure
+#srs = [FWSampling(), LazyTrackAndStop(), ConvexGame(CTracking), LearnerK(CTracking), RoundRobin()]; # (2) run all except XYAdaptive for δs = (0.1,0.01,0.001,0.0001)
+#srs = [XYAdaptive()]; # (3) separately run for different δs
 
 """
 Note that XY-Adaptive can only run for one δ.
 If you'd like to run multiple δs, e.g., δs=(0.1, 0.01, 0.0001, 0.00001),
 then please remove XYAdaptive() from the srs
 """
-δs = (0.1,0.01,0.001,0.0001); # Please see the above comment
+δs = (0.01,); # (1)
+#δs = (0.1,0.01,0.001,0.0001); # (2)
+#δs = (0.1,); # (3) separately run for each δ
 βs = GK16.(δs);
 repeats = 1000;
 seed = 1234;
@@ -50,5 +50,5 @@ println("ω=$ω, dim=$dim, repeat $repeats times");
 );
 dump_stats(pep, μ, δs, βs, srs, data, repeats);
 # save
-@save isempty(ARGS) ? "BAI.dat" : ARGS[1] dist μ pep srs data δs βs repeats seed
+@save isempty(ARGS) ? "BAI_0.01.dat" : ARGS[1] dist μ pep srs data δs βs repeats seed
 # visualise by loading viz.jl

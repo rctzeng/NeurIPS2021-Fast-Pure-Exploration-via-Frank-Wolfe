@@ -8,19 +8,19 @@ include("../utilities/tracking.jl");
 include("../utilities/envelope.jl");
 ###################################################################### Ours ######################################################################
 """
-Ours: Best Challenger
+Ours: Frank-Wolfe based Sampling
 """
-struct BestChallengerTracking end
-long(sr::BestChallengerTracking) = "BestChallenger";
-abbrev(sr::BestChallengerTracking) = "BC";
-mutable struct BestChallengerTrackingState
+struct FWSampling end
+long(sr::FWSampling) = "FW-Sampling";
+abbrev(sr::FWSampling) = "FWS";
+mutable struct FWSamplingState
     x;
-    BestChallengerTrackingState(K) = new([1.0/K for i=1:K]);
+    FWSamplingState(K) = new([1.0/K for i=1:K]);
 end
-function start(sr::BestChallengerTracking, N)
-    BestChallengerTrackingState(length(N));
+function start(sr::FWSampling, N)
+    FWSamplingState(length(N));
 end
-function nextsample(sr::BestChallengerTrackingState, pep, istar, ξ, N, S)
+function nextsample(sr::FWSamplingState, pep, istar, ξ, N, S)
     K = length(N);
     t = sum(N);
     r = t^(-9.0/10)/K;

@@ -10,21 +10,21 @@ include("../utilities/tracking.jl");
 include("../utilities/envelope.jl");
 ###################################################################### Ours ######################################################################
 """
-Ours: Best Challenger
+Ours: Frank-Wolfe based Sampling
 """
-struct BestChallengerTracking
+struct FWSampling
 end
-long(sr::BestChallengerTracking) = "BestChallenger";
-abbrev(sr::BestChallengerTracking) = "BC";
-mutable struct BestChallengerTrackingState
+long(sr::FWSampling) = "FW-Sampling";
+abbrev(sr::FWSampling) = "FWS";
+mutable struct FWSamplingState
     x;
     Vxinv;
-    BestChallengerTrackingState(K, Vxinv) = new([1.0/K for i=1:K], Vxinv);
+    FWSamplingState(K, Vxinv) = new([1.0/K for i=1:K], Vxinv);
 end
-function start(sr::BestChallengerTracking, N, Vxinv)
-    BestChallengerTrackingState(length(N), Vxinv);
+function start(sr::FWSampling, N, Vxinv)
+    FWSamplingState(length(N), Vxinv);
 end
-function nextsample(sr::BestChallengerTrackingState, pep::LinearBestArm, N, S, Vinv)
+function nextsample(sr::FWSamplingState, pep::LinearBestArm, N, S, Vinv)
     K = length(N); t = sum(N); hw = N./t; hμ = Vinv*S; hr = [hμ'pep.arms[k] for k=1:K]; hi = argmax(hr);
     r = t^(-9/10)/K; z = [0.0 for i=1:K];
     if !hμ_in_lambda(hr, hi, K) || is_complete_square(floor(Int, t/K))
@@ -49,7 +49,7 @@ function nextsample(sr::BestChallengerTrackingState, pep::LinearBestArm, N, S, V
     setfield!(sr, :Vxinv, nextVxinv);
     return hi, argmax(sr.x ./ hw);
 end
-function nextsample(sr::BestChallengerTrackingState, pep::LinearThreshold, N, S, Vinv)
+function nextsample(sr::FWSamplingState, pep::LinearThreshold, N, S, Vinv)
     K = length(N); t = sum(N); hw = N./t; hμ = Vinv*S; hr = [hμ'pep.arms[k] for k=1:K]; hi = argmax(hr);
     r = t^(-9/10)/K; z = [0.0 for i=1:K];
     if !hμ_in_lambda_threshold(hr, K, pep.threshold) || is_complete_square(t)
@@ -78,12 +78,13 @@ end
 ###################################################################### Baselines ######################################################################
 """
 Our implementation of Lazy T&S (Jedra and Proutiere, 2020)
+with heuristic stopping time (see their appendix A.1)
+and without their special design for coping with "many-arm" setting
 """
 struct LazyTrackAndStop
-    DesignType; # P: the version in main context, H: the heuristic version in appendix A.1
 end
-long(sr::LazyTrackAndStop) = "LazyTaS" * ((sr.DesignType=="P") ? "" : ("-"*sr.DesignType));
-abbrev(sr::LazyTrackAndStop) = "LT" * ((sr.DesignType=="P") ? "" : ("-"*sr.DesignType));
+long(sr::LazyTrackAndStop) = "LazyTaS";
+abbrev(sr::LazyTrackAndStop) = "LT";
 mutable struct LazyTrackAndStopState
     sumw;
     w;
@@ -97,11 +98,8 @@ function check_power2(t)
     return (t == 2^exponent);
 end
 function β(sr::LazyTrackAndStop, A, c1, c2, c3, dim, δ, t) # threshold
-    if sr.DesignType == "P" # (Eq 9) in main paper of (Jedra and Proutiere, 2020)
-        return c2 * log(sqrt(det((1/(0.1*c1))*A + Matrix{Float64}(I,dim,dim))) / δ);
-    elseif sr.DesignType == "H" # the version called modified threshold described in appendix A.1 of (Jedra and Proutiere, 2020)
-        return c2 * (log(1/δ) + 0.5*log(t) + c3);
-    end
+    #return c2 * log(sqrt(det((1/(0.1*c1))*A + Matrix{Float64}(I,dim,dim))) / δ); # (Eq 9) in main paper of (Jedra and Proutiere, 2020)
+    return c2 * (log(1/δ) + 0.5*log(t) + c3); #The version called modified threshold described in appendix A.1 of (Jedra and Proutiere, 2020)
 end
 function nextsample(sr::LazyTrackAndStopState, pep, N, S, Vinv, A, A0, i0, c0)
     K = length(N); t = sum(N); hμ = Vinv*S; dim = length(hμ); hi = argmax([hμ'pep.arms[k] for k=1:K]);
@@ -120,7 +118,8 @@ function nextsample(sr::LazyTrackAndStopState, pep, N, S, Vinv, A, A0, i0, c0)
         setfield!(sr, :w, w);
     end
     setfield!(sr, :sumw, sr.sumw+sr.w);
-    (minimum(eigvals(A)) < c0 * sqrt(t)) ? arm = A0[i0+1] : arm = argmin(N - sr.sumw); # choose the arm
+     # we simplify the arm tracking rule, without implementing their special design for coping issues arised in "many-arm" setting
+    (minimum(eigvals(A)) < c0 * sqrt(t)) ? arm = A0[i0+1] : arm = argmin(N - sr.sumw);
 
     return hi, arm, (i0+1) % dim; # tracking
 end
@@ -294,6 +293,41 @@ function nextsample(sr::XYAdaptiveState, pep, N, S, Vinv, Xactive, α, ρ, ρ_ol
     ρ = maximum([transpose(Y[i]) * sherman_morrison(Vinv, pep.arms[k]) * Y[i] for i = 1:nb_gaps])
     return star, k, Xactive, ρ, ρ_old, t_old
 end
+
+
+
+"""
+LinGapE (Xu et al. 2018) implemented by Xuedong Shang
+"""
+struct LinGapE end
+long(sr::LinGapE) = "LinGapE";
+abbrev(sr::LinGapE) = "LG";
+function start(sr::LinGapE, N)
+    return sr
+end
+function gap(arm1, arm2, μ)
+    (arm1 - arm2)'μ
+end
+function confidence(arm1, arm2, Vinv)
+    sqrt(transpose(arm1 - arm2) * Vinv * (arm1 - arm2))
+end
+function nextsample(sr::LinGapE, pep, star, ξ, N, S, Vinv, β)
+    hμ = Vinv * S # emp. estimates
+    nb_I = nanswers(pep, hµ)
+    K = length(pep.arms)
+    star = istar(pep, hµ)
+    c_t = sqrt(2 * β)
+    ucb, ambiguous = findmax([gap(pep.arms[i], pep.arms[star], hμ) +
+                              confidence(pep.arms[i], pep.arms[star], Vinv) * c_t for i = 1:K])
+    k = argmin([confidence(
+        pep.arms[star],
+        pep.arms[ambiguous],
+        sherman_morrison(Vinv, pep.arms[i]),
+    ) for i = 1:K])
+    return star, k, ucb
+end
+
+
 
 """
 Uniform sampling implemented by Xuedong Shang

@@ -28,7 +28,7 @@ function runit(seed, sr, μs, pep::LinearThreshold, βs)
     # pep: pure exploration problem.
     # βs: list of thresholds.
     convex_sr = (typeof(sr) == ConvexGame) || (typeof(sr) == LearnerK);  # test if P is needed.
-    qbc_sr = typeof(sr) == BestChallengerTracking;
+    qbc_sr = typeof(sr) == FWSampling;
     βs = collect(βs) # mutable copy
     rng = MersenneTwister(seed)
     K = narms(pep, µs)
